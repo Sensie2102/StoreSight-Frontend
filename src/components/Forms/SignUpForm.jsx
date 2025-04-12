@@ -190,6 +190,20 @@ const SignUpForm = () => {
             <FcGoogle size={20} />
             <span>Sign up with Google</span>
           </Button>
+          
+          <Button
+            onClick={() => {
+                const fakeToken = "dev-fake-token";
+                localStorage.setItem("access_token", fakeToken);
+                setAccessToken(fakeToken);
+                navigate("/dashboard");
+              }}
+               variant="secondary"
+              className="w-full mt-4"
+          >
+            Dev Login (Bypass Auth)
+          </Button>
+
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Already have an account?{" "}
