@@ -16,36 +16,77 @@ import {
   ComposedChart,
 } from "recharts";
 
-
-const initialData = [
-  { name: "Jan", revenue: 400, users: 240, transactions: 100 },
-  { name: "Feb", revenue: 300, users: 139, transactions: 80 },
-  { name: "Mar", revenue: 600, users: 380, transactions: 150 },
-  { name: "Apr", revenue: 800, users: 520, transactions: 180 },
-  { name: "May", revenue: 500, users: 380, transactions: 120 },
-  { name: "Jun", revenue: 900, users: 620, transactions: 220 },
-  { name: "Jul", revenue: 700, users: 510, transactions: 170 },
-];
-
 const ChartComponent = () => {
-  const [data, setData] = useState(initialData);
   const [chartType, setChartType] = useState("bar");
-
-  // Simulate dynamic data update
+  const [freq, setFreq] = useState("W");
+  const [data, setData] = useState([]);
+  // eslint-disable-next-line no-unused-vars
+  const [offset, setOffset] = useState(0);
+  // eslint-disable-next-line no-unused-vars
+  const [limit, setLimit] = useState(10);
+  const [startDate, setStartDate] = useState(null);
+  const [endDate, setEndDate] = useState(null);
+  const isTest = true;
   useEffect(() => {
-    const interval = setInterval(() => {
-      setData((currentData) =>
-        currentData.map((item) => ({
-          ...item,
-          revenue: Math.max(100, item.revenue + Math.floor(Math.random() * 100) - 50),
-          users: Math.max(50, item.users + Math.floor(Math.random() * 50) - 25),
-          transactions: Math.max(30, item.transactions + Math.floor(Math.random() * 30) - 15),
-        }))
-      );
-    }, 3000);
+    let past, today;
 
-    return () => clearInterval(interval);
-  }, []);
+    if (isTest) {
+      past = new Date("2018-01-01");
+      today = new Date("2018-04-01");
+    } else {
+      today = new Date();
+      past = new Date();
+
+      if (freq === "W") {
+        past.setDate(today.getDate() - 7 * limit);
+      } else {
+        past.setMonth(today.getMonth() - limit);
+      }
+    }
+
+    setStartDate(past.toISOString().split("T")[0]);
+    setEndDate(today.toISOString().split("T")[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [freq, limit]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!startDate || !endDate) return;
+
+      try {
+        const token = localStorage.getItem("access_token");
+        const params = new URLSearchParams({
+          freq,
+          offset: offset.toString(),
+          limit: limit.toString(),
+          start_date: startDate,
+          end_date: endDate,
+        });
+
+        const response = await fetch(`http://localhost:8000/analytics/revenue_batch?${params}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const result = await response.json();
+
+        const formatted = result.data.map(item => ({
+          ...item,
+          name: new Date(item.date).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          }),
+        }));
+        console.log("Formatted data:", formatted); // Debugging line
+        setData(formatted);
+      } catch (err) {
+        console.error("Error fetching revenue batch data:", err);
+      }
+    };
+
+    fetchData();
+  }, [freq, offset, limit, startDate, endDate]);
 
   const renderChart = () => {
     switch (chartType) {
@@ -58,8 +99,6 @@ const ChartComponent = () => {
             <Tooltip />
             <Legend />
             <Line type="monotone" dataKey="revenue" stroke="#8884d8" />
-            <Line type="monotone" dataKey="users" stroke="#82ca9d" />
-            <Line type="monotone" dataKey="transactions" stroke="#ffc658" />
           </LineChart>
         );
       case "area":
@@ -70,9 +109,7 @@ const ChartComponent = () => {
             <YAxis />
             <Tooltip />
             <Legend />
-            <Area type="monotone" dataKey="revenue" stackId="1" stroke="#8884d8" fill="#8884d8" />
-            <Area type="monotone" dataKey="users" stackId="2" stroke="#82ca9d" fill="#82ca9d" />
-            <Area type="monotone" dataKey="transactions" stackId="3" stroke="#ffc658" fill="#ffc658" />
+            <Area type="monotone" dataKey="revenue" stroke="#8884d8" fill="#8884d8" />
           </AreaChart>
         );
       case "composed":
@@ -84,8 +121,7 @@ const ChartComponent = () => {
             <Tooltip />
             <Legend />
             <Bar dataKey="revenue" fill="#8884d8" />
-            <Line type="monotone" dataKey="users" stroke="#82ca9d" />
-            <Area type="monotone" dataKey="transactions" fill="#ffc658" stroke="#ffc658" />
+            <Line type="monotone" dataKey="revenue" stroke="#82ca9d" />
           </ComposedChart>
         );
       default:
@@ -97,8 +133,6 @@ const ChartComponent = () => {
             <Tooltip />
             <Legend />
             <Bar dataKey="revenue" fill="#8884d8" />
-            <Bar dataKey="users" fill="#82ca9d" />
-            <Bar dataKey="transactions" fill="#ffc658" />
           </BarChart>
         );
     }
@@ -107,15 +141,20 @@ const ChartComponent = () => {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Monthly Performance</CardTitle>
+        <CardTitle>Revenue (Batched)</CardTitle>
         <div className="flex gap-2">
+          <button
+            onClick={() => setFreq(freq === "W" ? "M" : "W")}
+            className="px-2 py-1 text-xs rounded bg-blue-200"
+          >
+            {freq === "W" ? "Weekly" : "Monthly"}
+          </button>
           {["bar", "line", "area", "composed"].map((type) => (
             <button
               key={type}
               onClick={() => setChartType(type)}
-              className={`px-3 py-1 text-sm rounded ${
-                chartType === type ? "bg-gray-200" : "bg-gray-100"
-              }`}
+              className={`px-2 py-1 text-xs rounded ${chartType === type ? "bg-green-300" : "bg-gray-100"
+                }`}
             >
               {type === "composed" ? "Mixed" : type.charAt(0).toUpperCase() + type.slice(1)}
             </button>
